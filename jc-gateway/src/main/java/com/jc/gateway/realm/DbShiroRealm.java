@@ -1,9 +1,13 @@
 package com.jc.gateway.realm;
 
 
+import com.jc.gateway.entity.User;
 import org.apache.shiro.authc.*;
+import org.apache.shiro.authc.credential.HashedCredentialsMatcher;
+import org.apache.shiro.authc.credential.SimpleCredentialsMatcher;
 import org.apache.shiro.authz.AuthorizationInfo;
 import org.apache.shiro.authz.SimpleAuthorizationInfo;
+import org.apache.shiro.crypto.hash.Sha256Hash;
 import org.apache.shiro.realm.AuthorizingRealm;
 import org.apache.shiro.subject.PrincipalCollection;
 import org.apache.shiro.util.ByteSource;
@@ -18,7 +22,10 @@ public class DbShiroRealm extends AuthorizingRealm {
     private static final String encryptSalt = "F12839WhsnnEV$#23b";
 
 
-
+    public DbShiroRealm() {
+        //因为数据库中的密码做了散列，所以使用shiro的散列Matcher
+//        this.setCredentialsMatcher(new SimpleCredentialsMatcher());
+    }
     /**
      *  找它的原因是这个方法返回true
      */
@@ -33,12 +40,15 @@ public class DbShiroRealm extends AuthorizingRealm {
     @Override
     protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken token) throws AuthenticationException {
         UsernamePasswordToken userpasswordToken = (UsernamePasswordToken)token;
-        String username = userpasswordToken.getUsername();
-        String password = String.valueOf(userpasswordToken.getPassword());
+//        String username = userpasswordToken.getUsername();
+//        String password = String.valueOf(userpasswordToken.getPassword());
+        User user = new User();
+        user.setUsername("");
+        user.setPassword("");
 
         //用户登录成功 调取刷新api接口
         //mscUserService.saveUserApis(username);
-        return new SimpleAuthenticationInfo(userpasswordToken, userpasswordToken.getPassword(), ByteSource.Util.bytes(encryptSalt), "dbRealm");
+        return new SimpleAuthenticationInfo(user, user.getPassword(), ByteSource.Util.bytes(encryptSalt), "dbRealm");
     }
 
 

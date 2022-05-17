@@ -26,6 +26,10 @@ public class LoginFilter extends AuthorizationFilter {
     protected boolean isAccessAllowed(ServletRequest servletRequest, ServletResponse servletResponse, Object o) throws Exception {
         String requestURI = ((HttpServletRequest) servletRequest).getRequestURI();
         System.out.println(requestURI);
+        if(requestURI.equals("/login")){
+            return true;
+        }
+
         return false;
     }
 
@@ -42,7 +46,7 @@ public class LoginFilter extends AuthorizationFilter {
         jsonObject.put("msg", ResultCodes.UNAUTHORIZED.getMsg());
         jsonObject.put("data",ResultCodes.UNAUTHORIZED.getMsg());
         response.getWriter().write(jsonObject.toJSONString());
-        httpResponse.sendRedirect("/login");
+        httpResponse.sendRedirect("/login?password="+request.getParameter("password"));
         return false;
     }
 }
