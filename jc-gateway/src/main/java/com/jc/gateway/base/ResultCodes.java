@@ -1,10 +1,6 @@
-package com.jc.gateway.enums;
+package com.jc.gateway.base;
 
-/**
- * 
- * @author lxs
- *
- */
+
 public enum ResultCodes {
 
     /**

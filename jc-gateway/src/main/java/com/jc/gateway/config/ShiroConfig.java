@@ -2,7 +2,9 @@ package com.jc.gateway.config;
 
 
 import com.jc.gateway.filter.LoginFilter;
-import com.jc.gateway.realm.DbShiroRealm;
+import com.jc.gateway.filter.TokenFilter;
+import com.jc.gateway.realm.LoginShiroRealm;
+import com.jc.gateway.realm.JwtShiroRealm;
 import org.apache.shiro.authc.Authenticator;
 import org.apache.shiro.authc.pam.FirstSuccessfulStrategy;
 import org.apache.shiro.authc.pam.ModularRealmAuthenticator;
@@ -32,10 +34,10 @@ public class ShiroConfig {
      * 初始化Authenticator
      */
     @Bean
-    public Authenticator authenticator() {
+    public Authenticator authenticator(UserService userService) {
         ModularRealmAuthenticator authenticator = new ModularRealmAuthenticator();
         //设置两个Realm，一个用于用户登录验证和访问权限获取；一个用于jwt token的认证
-        authenticator.setRealms(Arrays.asList(dbShiroRealm()));
+        authenticator.setRealms(Arrays.asList(dbShiroRealm(userService),jwtShiroRealm(userService)));
         //设置多个realm认证策略，一个成功即跳过其它的
         authenticator.setAuthenticationStrategy(new FirstSuccessfulStrategy());
         return authenticator;
@@ -80,19 +82,19 @@ public class ShiroConfig {
      * 用于用户名密码登录时认证的realm
      */
     @Bean("dbRealm")
-    public Realm dbShiroRealm() {
-        DbShiroRealm myShiroRealm = new DbShiroRealm();
+    public Realm dbShiroRealm(UserService users) {
+        LoginShiroRealm myShiroRealm = new LoginShiroRealm(users);
         return myShiroRealm;
     }
 
     /**
      * 用于JWT token认证的realm
      */
-//    @Bean("jwtRealm")
-//    public Realm jwtShiroRealm(UserService userService) {
-//        JWTShiroRealm myShiroRealm = new JWTShiroRealm(userService);
-//        return myShiroRealm;
-//    }
+    @Bean("jwtRealm")
+    public Realm jwtShiroRealm(UserService userService) {
+        JwtShiroRealm myShiroRealm = new JwtShiroRealm(userService);
+        return myShiroRealm;
+    }
 
     /**
      * 设置过滤器 将自定义的Filter加入
@@ -102,7 +104,8 @@ public class ShiroConfig {
         ShiroFilterFactoryBean factoryBean = new ShiroFilterFactoryBean();
         factoryBean.setSecurityManager(securityManager);
         Map<String, Filter> filterMap = factoryBean.getFilters();
-        filterMap.put("authcToken", createAuthFilter());
+        filterMap.put("login", createLoginFilter(userService));
+        filterMap.put("authcToken", createAuthFilter(userService));
         factoryBean.setFilters(filterMap);
         factoryBean.setFilterChainDefinitionMap(shiroFilterChainDefinition().getFilterChainMap());
 
@@ -112,38 +115,20 @@ public class ShiroConfig {
     protected ShiroFilterChainDefinition shiroFilterChainDefinition() {
         DefaultShiroFilterChainDefinition chainDefinition = new DefaultShiroFilterChainDefinition();
         //login不做认证，noSessionCreation的作用是用户在操作session时会抛异常
-        chainDefinition.addPathDefinition("/user/login", "noSessionCreation,anon");
-        chainDefinition.addPathDefinition("/schedule-center/websocketLog/**", "noSessionCreation,anon");
-        //数据中心bs-hive websocket接口放开认证
-        chainDefinition.addPathDefinition("/bs-hive/hiveWebSocketServer/**", "noSessionCreation,anon");
-        //放开bi登录认证
-        chainDefinition.addPathDefinition("/bi/userLogin", "noSessionCreation,anon");
-        //圆心惠宝放开校验
-        chainDefinition.addPathDefinition("/yxhb/free/**", "noSessionCreation,anon");
-        //放开元数据登录认证
-        chainDefinition.addPathDefinition("/**/login", "noSessionCreation,anon");
-        chainDefinition.addPathDefinition("/**/downloadRecord/**", "noSessionCreation,anon");
-        //做用户认证，permissive参数的作用是当token无效时也允许请求访问，不会返回鉴权未通过的错误
-        chainDefinition.addPathDefinition("/user/logout", "noSessionCreation,authcToken[permissive]");
-        //chainDefinition.addPathDefinition("/image/**", "anon");
-        //chainDefinition.addPathDefinition("/admin/**", "noSessionCreation,authcToken,anyRole[admin,manager]"); //只允许admin或manager角色的用户访问
-        //chainDefinition.addPathDefinition("/article/list", "noSessionCreation,authcToken");
-        //chainDefinition.addPathDefinition("/article/*", "noSessionCreation,authcToken[permissive]");
-        //获取用户信息 只需要token 不需要角色校验
-        /*chainDefinition.addPathDefinition("/user/getUserInfo", "noSessionCreation,authcToken");
-        chainDefinition.addPathDefinition("/umc/helper/**", "noSessionCreation,authcToken");
-        chainDefinition.addPathDefinition("/umc/user/getUserRouteList", "noSessionCreation,authcToken");*/
-        // 默认进行用户鉴权
-        //chainDefinition.addPathDefinition("/umc/route/**", "noSessionCreation,anon");
-        chainDefinition.addPathDefinition("/**", "noSessionCreation,authcToken");
+        chainDefinition.addPathDefinition("/toLogin", "noSessionCreation,anon");
+        chainDefinition.addPathDefinition("/login", "noSessionCreation,anon");
+        chainDefinition.addPathDefinition("/**", "noSessionCreation,login,authcToken");
         return chainDefinition;
     }
 
     //注意不要加@Bean注解，不然spring会自动注册成filter
-    protected LoginFilter createAuthFilter(){
-        return new LoginFilter();
+    protected TokenFilter createAuthFilter(UserService userService){
+        return new TokenFilter(userService);
     }
 
-
+    //注意不要加@Bean注解，不然spring会自动注册成filter
+    protected LoginFilter createLoginFilter(UserService userService){
+        return new LoginFilter(userService);
+    }
 
 }

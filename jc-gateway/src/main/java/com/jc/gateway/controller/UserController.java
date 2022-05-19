@@ -1,30 +1,54 @@
 package com.jc.gateway.controller;
  
+import com.alibaba.fastjson.JSONObject;
+import com.jc.gateway.base.Result;
+import com.jc.gateway.base.ResultCodes;
+import com.jc.gateway.entity.dto.UserDto;
+import com.jc.gateway.entity.token.TokenCache;
+import com.jc.gateway.service.UserService;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.SecurityUtils;
+import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.authc.IncorrectCredentialsException;
 import org.apache.shiro.authc.UnknownAccountException;
 import org.apache.shiro.authc.UsernamePasswordToken;
 import org.apache.shiro.subject.Subject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.Map;
 
 @Controller
 @Slf4j
 public class UserController {
 	private Logger logger = LoggerFactory.getLogger(UserController.class);
+
+	@Autowired
+	UserService userService;
 	
 	@RequestMapping("/hi")
 	public String hi(){
 		return "hi shiro";
 	}
+
+	@Autowired
+	TokenCache tokenCache;
+
+	@Autowired
+	ApplicationContext applicationContext;
 
 	/**
 	 * 方式一：返回ModelAndView
@@ -67,31 +91,48 @@ public class UserController {
 	}
 
 	@RequestMapping("/login")
-	public String login(String username, String password, Model model) {
+	public ResponseEntity<Object> login(@RequestParam String username,@RequestParam char[] password, HttpServletRequest request) {
+		UserDto loginInfo = new UserDto(username,password);
 		//使用shiro编写认证操作
 		//获取Subject
 		Subject subject = SecurityUtils.getSubject();
 		//封装用户数据
-		UsernamePasswordToken token = new UsernamePasswordToken(username, password);
+		UsernamePasswordToken token = new UsernamePasswordToken(loginInfo.getUsername(), loginInfo.getPassword());
 		//执行登录方法
+		JSONObject jsonObject = new JSONObject();
 		try {
 			//只要执行login方法，就会去执行UserRealm中的认证逻辑
 			subject.login(token);
 
 			//如果没有异常，代表登录成功
-			//跳转到textThymeleaf页面，代表主页
-			return "redirect:/index";
+			//Shiro认证通过后会将user信息放到subject内，生成token并返回
+			UserDto user = (UserDto) subject.getPrincipal();
+			String newToken = userService.generateJwtToken(user.getUsername(),loginInfo.getPassword());
+			//response.setHeader("x-auth-token", newToken);
+			jsonObject.put("x-auth-token",newToken);
+			//模拟放入redis场景
+			Map<String,String> tokenMap = new HashMap<>();
+			tokenMap.put(user.getUsername(),newToken);
+			tokenCache.addTokens(tokenMap);
+			TokenCache bean = applicationContext.getBean(TokenCache.class);
+			return new ResponseEntity<>(new Result(ResultCodes.SUCCESS.getCode(),"登录成功",jsonObject), HttpStatus.OK);
 		} catch (UnknownAccountException e) {
-			logger.info(username + "用户名不存在");
 			//登录失败
-			model.addAttribute("msg", "用户名不存在");
-			return "login";
+			e.printStackTrace();
+			jsonObject.put("msg","登录失败");
+			return new ResponseEntity<>(new Result(ResultCodes.INTERNAL_ERROR.getCode(),"登录失败",jsonObject), HttpStatus.OK);
 
-		} catch (IncorrectCredentialsException e) {
-			logger.info(username + "密码错误");
-			model.addAttribute("msg", "密码错误");
-			return "login";
+		} catch (AuthenticationException e) {
+			e.printStackTrace();
+			jsonObject.put("msg","账号或密码错误");
+			return new ResponseEntity<>(new Result(ResultCodes.NO_LOGIN.getCode(),"账号或密码错误",jsonObject), HttpStatus.OK);
 		}
+	}
+
+	@RequestMapping("/toLogin")
+	public String toLogin(Model model) {
+		model.addAttribute("msg", "请登录");
+		return "login";
 	}
 
 	@Data

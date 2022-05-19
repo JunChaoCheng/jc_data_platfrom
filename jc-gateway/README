@@ -1,0 +1,6 @@
+网关简单统一鉴权服务
+流程
+1.访问受保护的页面例如index.html，首先会被LoginFilter过滤器拦截,判断如果请求头中没有token直接重定向到login页面
+2.输入用户名密码登录subject.login方法自行获取自定义realm的doGetAuthenticationInfo方法返回的对象和输入的对象进行match,这里使用HashedCredentialsMatcher进行密码校验,也可手动添加自定义的matcher
+3.校验通过返回生成的token,同时把生成的token存起来,这里存放到本地缓存,实际可放到redis中
+4.在访问的时候把生成返回的token放入请求头中,这时通过TokenFilter进行token检验(和上一步缓存的token进行比对),通过后即可访问到对应的页面
