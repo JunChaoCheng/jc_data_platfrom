@@ -101,6 +101,7 @@ public class UserController {
 		//执行登录方法
 		JSONObject jsonObject = new JSONObject();
 		try {
+			System.out.println("controller 方法");
 			//只要执行login方法，就会去执行UserRealm中的认证逻辑
 			subject.login(token);
 

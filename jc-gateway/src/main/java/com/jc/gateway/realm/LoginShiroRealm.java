@@ -28,7 +28,6 @@ public class LoginShiroRealm extends AuthorizingRealm {
         //因为数据库中的密码做了散列，所以使用shiro的散列Matcher
         this.setCredentialsMatcher(new HashedCredentialsMatcher(Sha256Hash.ALGORITHM_NAME));
     }
-
     /**
      *  找它的原因是这个方法返回true
      */
